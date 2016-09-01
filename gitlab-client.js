@@ -26,6 +26,22 @@ GitlabClient.prototype.auth = function(username, password, cb) {
 	});
 };
 
+GitlabClient.prototype.token = function (token, cb) {
+	var params = {
+		url: this.url + 'user',
+		method: 'GET',
+		qs: {
+			private_token: token,
+		},
+		ca: this.options.caFile
+	};
+	request(params, function (error, response, user) {
+		if (error) return cb(error);
+		if (response.statusCode < 200 || response.statusCode >= 300) return cb('Invalid status code ' + response.statusCode);
+		cb(null, user);
+	});
+};
+
 GitlabClient.prototype.paginate = function(params, cb) {
 	params.qs.per_page = 50;
 	params.qs.page = 1;

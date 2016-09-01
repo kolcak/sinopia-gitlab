@@ -98,6 +98,7 @@ function SinopiaGitlab(settings, params) {
 	this.searchNamespaces = settings.gitlab_namespaces || [];
 	this.useScopeAsGroup = settings.gitlab_use_scope_as_group || false;
 	this.projectPrefix = settings.gitlab_project_prefix || '';
+	this.tokenPrefix = settings.gitlab_project_prefix || 'token';
 }
 
 SinopiaGitlab.prototype._getAdminToken = function(cb) {
@@ -248,11 +249,16 @@ SinopiaGitlab.prototype.authenticate = function(username, password, cb) {
 	// on failed password: cb(null, false)
 	// on success: cb(null, [username, groups...])
 	var self = this;
+	var useToken = false;
+	var parse = username.trim().split('-');
+	if(parse[0] === this.tokenPrefix) {
+		useToken = true;
+	}
 	checkCache('auth-' + username, password, 900, function(key, extraParams, cb) {
-		self.gitlab.auth(username, password, function(error, user) {
-			if(error) {
+		function setUser(error, user, callback) {
+			if (error) {
 				self.logger.error('Error authenticating to gitlab: ' + error);
-				cb(null, false, false);
+				callback(null, false, false);
 			} else {
 				cacheSet('user-' + username, user);
 				cacheSet('token-' + username, user.private_token);
@@ -260,7 +266,17 @@ SinopiaGitlab.prototype.authenticate = function(username, password, cb) {
 					password: password
 				});
 			}
-		});
+		}
+
+		if (useToken) {
+			self.gitlab.token(password, function (error, user) {
+				setUser(error, user, cb);
+			});
+		} else {
+			self.gitlab.auth(username, password, function (error, user) {
+				setUser(error, user, cb);
+			});
+		}
 	}, function(error, cachedAuth) {
 		if (cachedAuth.password !== password) {
 			return cb(new Error('Password does not match'));
